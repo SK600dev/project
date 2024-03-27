@@ -1,0 +1,12 @@
+CREATE TABLE Descriptions (
+    id	INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL  UNIQUE,
+    text_description TEXT
+);
+CREATE TABLE Tasks (
+    id	INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL  UNIQUE,
+    id_user	INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    date_  TEXT,
+    description_id INTEGER NOT NULL,
+    FOREIGN KEY (description_id) REFERENCES Descriptions(id)
+);
