@@ -1,11 +1,12 @@
 from datetime import datetime
+import asyncio
 
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery
 
 import keybords
-from loader import dp
+from loader import dp, bot
 from models.parse_date import parse_date
 from states import AddTask
 from utils import db, set_new_at_job
@@ -68,7 +69,7 @@ async def skip_description(call: CallbackQuery, callback_data: dict, state: FSMC
     await call.message.answer('Вы успешно добавили задачу!\n'
                               f'Название : {name}\n'
                               f'Выполнить до : {" ".join(date.split()[::-1]).replace(" ", "/")}\n')
-    await call.message.answer("Если хотите добавить уведомление напишите время в формате HH:MM: ",
+    await call.message.answer("Если хотите добавить уведомление напишите время в формате HH:MM ",
                               reply_markup=keybords.cancel)
     await AddTask.AddNotification.set()
 
@@ -88,7 +89,7 @@ async def add_description(message: types.Message, state: FSMContext):
                          f'Выполнить до : {" ".join(date.split()[::-1]).replace(" ", "/")}\n'
                          f'Описание : {description}')
     await AddTask.AddNotification.set()
-    await message.answer("Если хотите добавить уведомление напишите время в формате HH:MM: ",
+    await message.answer("Если хотите добавить уведомление напишите время в формате HH:MM ",
                          reply_markup=keybords.cancel)
 
 
@@ -99,25 +100,26 @@ async def stop_add_tasks(call: CallbackQuery, state: FSMContext):
     await state.reset_state()
 
 
-@dp.message_handler(state=AddTask.AddNotification)  # добавляем уведомление
-async def add_notification(message: types.Message, state: FSMContext):
-    time_ = message.text
-    try:
-        datetime.strptime(time_, "%H:%M")
-    except ValueError:
-        await message.answer('Время должно быть в формате HH:MM: ',
-                             reply_markup=keybords.cancel)
-        return
-    data = await state.get_data()
-    date_ = data.get('date').split()[::-1]
-    date_at = f"{time_} {date_[0]}.{date_[1]}.20{date_[2]}"
-    name = data.get('name')
-    description = data.get('description')
-    text = 'Напоминаю!\n' \
-           f'Название : {name}\n' \
-           f'Выполнить до : {" ".join(date_).replace(" ", "/")}\n' \
-           f'Описание : {description}'
+@dp.message_handler(state=AddTask.AddNotification)  # добавляем уведомление 
+async def add_notification(message: types.Message, state: FSMContext): 
+    time_str = message.text 
+    try: 
+        # Парсим время из строки 
+        time_obj = datetime.strptime(time_str, "%H:%M") 
+        # Получаем текущую дату и время 
+        now = datetime.now() 
+        # Получаем разницу во времени между текущим временем и указанным временем 
+        time_delta = (datetime.combine(now.date(), time_obj.time()) - now).total_seconds() 
 
-    set_new_at_job(message.from_user.id, date_at, text)
-
-    await state.reset_state()
+        if time_delta > 0: 
+            # Ожидаем указанное время и отправляем сообщение 
+            await asyncio.sleep(time_delta) 
+            await bot.send_message(message.chat.id, "Напоминаю! У тебя есть невыполненные задачи. Чтобы посмотреть задачи введи /get.")
+        else: 
+            await message.answer("Указанное время уже прошло.") 
+            message = await bot.send_message(message.chat.id, "Пожалуйста, введите время в формате HH:MM")
+            await AddTask.AddNotification.set()  # Устанавливаем состояние снова для повторного запроса времени
+    except ValueError: 
+        await message.answer("Время должно быть в формате HH:MM.") 
+        message = await bot.send_message(message.chat.id, "Пожалуйста, введите время в формате HH:MM")
+        await AddTask.AddNotification.set()  # Устанавливаем состояние снова для повторного запроса времени          
