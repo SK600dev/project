@@ -115,6 +115,7 @@ async def add_notification(message: types.Message, state: FSMContext):
             # Ожидаем указанное время и отправляем сообщение 
             await asyncio.sleep(time_delta) 
             await bot.send_message(message.chat.id, "Напоминаю! У тебя есть невыполненные задачи. Чтобы посмотреть задачи введи /get.")
+            await state.finish()
         else: 
             await message.answer("Указанное время уже прошло.") 
             message = await bot.send_message(message.chat.id, "Пожалуйста, введите время в формате HH:MM")
